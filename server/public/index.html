@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Second Shift — Factorio Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Second Shift</h1>
+        <div id="status-bar">
+            <span id="connection-badge" class="badge disconnected">Connecting…</span>
+            <span id="last-update">Waiting for data…</span>
+        </div>
+        <div id="game-selector-wrap">
+            <span>Save:</span>
+            <select id="game-selector"><option value="">—</option></select>
+        </div>
+
+        <!-- View toggle -->
+        <div id="view-toggle">
+            <button class="view-btn active" data-view="overview">Overview</button>
+            <button class="view-btn" data-view="timeline">Timeline</button>
+        </div>
+
+        <!-- Planet filter — visible in both views -->
+        <div id="planet-filter-wrap">
+            <label for="planet-filter">Planet</label>
+            <select id="planet-filter">
+                <option value="all">All Planets</option>
+            </select>
+        </div>
+
+        <!-- Overview controls -->
+        <div id="overview-controls">
+            <nav id="category-filter">
+                <button class="filter-btn active" data-cat="items">Items</button>
+                <button class="filter-btn" data-cat="fluids">Fluids</button>
+                <button class="filter-btn" data-cat="electricity">Electricity</button>
+            </nav>
+            <label>Show top
+                <input id="top-n" type="number" value="20" min="5" max="200" step="5">
+            </label>
+            <label>Sort by
+                <select id="sort-by">
+                    <option value="consumed">Consumed/min</option>
+                    <option value="produced">Produced/min</option>
+                    <option value="deficit">Deficit severity</option>
+                    <option value="name">Name</option>
+                </select>
+            </label>
+        </div>
+
+        <!-- Timeline controls -->
+        <div id="timeline-controls" class="hidden">
+            <nav id="precision-filter">
+                <button class="filter-btn active" data-precision="live">Live (5s)</button>
+                <button class="filter-btn" data-precision="minute">Minutes (2h)</button>
+                <button class="filter-btn" data-precision="hour">Hours (5d)</button>
+            </nav>
+            <label>Category
+                <select id="timeline-cat">
+                    <option value="items">Items</option>
+                    <option value="fluids">Fluids</option>
+                </select>
+            </label>
+            <div id="item-search-wrap">
+                <input id="item-search" type="text" placeholder="Search items…" autocomplete="off">
+                <ul id="item-suggestions"></ul>
+            </div>
+            <div id="selected-items"></div>
+            <!-- Profile save / load -->
+            <div id="profile-controls">
+                <select id="profile-select"><option value="">— Load profile —</option></select>
+                <button id="profile-save" class="filter-btn">Save</button>
+                <button id="profile-delete" class="filter-btn">Delete</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Overview view -->
+    <main id="overview-view">
+        <section id="deficit-panel">
+            <h2>Deficits</h2>
+            <ul id="deficit-list">
+                <li class="placeholder">Waiting for data…</li>
+            </ul>
+        </section>
+        <section id="chart-section">
+            <canvas id="bar-chart"></canvas>
+        </section>
+    </main>
+
+    <!-- Timeline view -->
+    <main id="timeline-view" class="hidden">
+        <section id="timeline-section">
+            <div id="card-grid"></div>
+            <div id="timeline-empty">Select an item above to view its production history.</div>
+        </section>
+    </main>
+
+    <div id="waiting-overlay">Waiting for game…</div>
+
+    <script src="items.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

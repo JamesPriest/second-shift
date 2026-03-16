@@ -1,0 +1,9 @@
+{
+  "name": "second-shift",
+  "version": "1.0.0",
+  "title": "Second Shift Dashboard",
+  "author": "you",
+  "description": "Exports production/consumption statistics to script-output/second-shift.json every 5 seconds for the Second Shift dashboard.",
+  "dependencies": ["base >= 2.0.0"],
+  "factorio_version": "2.0"
+}
