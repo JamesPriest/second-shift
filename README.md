@@ -1,5 +1,7 @@
 # Second Shift
 
+**A completely vibe coded factorio mod -- I'm just here to solve a want on the game**. Do not ask me about the code, I'm barely competent as it is and the moment Claude starting churning I stopped thinking.
+
 Real-time Factorio production/consumption dashboard for a second monitor. Identifies bottlenecks and deficits without alt-tabbing from the game.
 
 ![Items tab showing produced vs consumed per minute with deficit highlighting]
@@ -17,13 +19,14 @@ Real-time Factorio production/consumption dashboard for a second monitor. Identi
 
 Copy the `factorio-mod/` folder into your Factorio mods directory and **rename it** to `second-shift_1.0.0`:
 
-| OS | Mods directory |
-|---|---|
-| Windows | `%APPDATA%\Factorio\mods\` |
-| Linux | `~/.factorio/mods/` |
-| Mac | `~/Library/Application Support/factorio/mods/` |
+| OS      | Mods directory                                 |
+| ------- | ---------------------------------------------- |
+| Windows | `%APPDATA%\Factorio\mods\`                     |
+| Linux   | `~/.factorio/mods/`                            |
+| Mac     | `~/Library/Application Support/factorio/mods/` |
 
 So the result looks like:
+
 ```
 mods/
 └── second-shift_1.0.0/
@@ -35,11 +38,11 @@ Enable the mod in Factorio → **Main Menu → Mods**, then start or load a save
 
 The mod writes stats every 5 seconds to:
 
-| OS | Output file |
-|---|---|
-| Windows | `%APPDATA%\Factorio\script-output\second-shift.json` |
-| Linux | `~/.factorio/script-output/second-shift.json` |
-| Mac | `~/Library/Application Support/factorio/script-output/second-shift.json` |
+| OS      | Output file                                                              |
+| ------- | ------------------------------------------------------------------------ |
+| Windows | `%APPDATA%\Factorio\script-output\second-shift.json`                     |
+| Linux   | `~/.factorio/script-output/second-shift.json`                            |
+| Mac     | `~/Library/Application Support/factorio/script-output/second-shift.json` |
 
 ---
 
@@ -78,13 +81,14 @@ The status badge in the top-left shows **Live** once data is flowing. The first 
 
 ## Dashboard overview
 
-| Control | Description |
-|---|---|
-| **Items / Fluids / Electricity** | Switch stat category |
-| **Show top N** | Limit how many rows the chart shows |
-| **Sort by** | Order by consumed, produced, deficit severity, or name |
+| Control                          | Description                                            |
+| -------------------------------- | ------------------------------------------------------ |
+| **Items / Fluids / Electricity** | Switch stat category                                   |
+| **Show top N**                   | Limit how many rows the chart shows                    |
+| **Sort by**                      | Order by consumed, produced, deficit severity, or name |
 
 **Left panel** lists every item currently in deficit, worst first:
+
 - 🔴 Red — consuming 50%+ more than producing (severe)
 - 🟡 Yellow — consuming any amount more than producing (warning)
 
@@ -97,6 +101,7 @@ The status badge in the top-left shows **Live** once data is flowing. The first 
 **Mod crashes on load** — confirm you are on Factorio 2.0+. The mod uses APIs (`helpers.write_file`, per-surface statistics) not available in 1.x.
 
 **Dashboard shows "No data yet"** — check that:
+
 1. The mod is enabled and the game is running (not paused)
 2. `FACTORIO_SCRIPT_OUTPUT` in `.env` points to the correct folder
 3. `second-shift.json` exists in that folder
