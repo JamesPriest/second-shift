@@ -7,7 +7,7 @@ const { WebSocketServer } = require('ws');
 const cors    = require('cors');
 const config  = require('./lib/config');
 const { startWatcher, clients, getLatest, getGameIsLive } = require('./lib/watcher');
-const { init: dbInit, getHistory, getCurrentGameId, listGames } = require('./lib/db');
+const { init: dbInit, getHistory, getCurrentGameId, listGames, forgetGame } = require('./lib/db');
 
 const app    = express();
 const server = http.createServer(app);
@@ -33,13 +33,42 @@ app.get('/icons/:name', (req, res) => {
     if (!/^[\w-]+$/.test(name)) return res.status(400).end();
     for (const mod of ICON_MODS) {
         const p = path.join(config.factorioDataPath, mod, 'graphics', 'icons', `${name}.png`);
-        if (fs.existsSync(p)) return res.sendFile(p);
+        if (fs.existsSync(p)) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.sendFile(p);
+        }
     }
     res.status(404).end();
 });
 
 // All known games (for the save selector)
 app.get('/api/games', (req, res) => res.json(listGames()));
+
+// Trigger an immediate backfill — writes a marker file to script-output so future
+// mod versions can detect it; also returns the Factorio console command as a fallback.
+app.post('/api/trigger-backfill', (req, res) => {
+    try {
+        fs.writeFileSync(
+            path.join(config.scriptOutputDir, 'second-shift-trigger.json'),
+            JSON.stringify({ type: 'backfill', requestedAt: new Date().toISOString() })
+        );
+    } catch (err) {
+        console.warn('[server] could not write backfill trigger file:', err.message);
+    }
+    res.json({ command: '/c storage.last_backfill_tick = nil' });
+});
+
+// Forget a game — remove it and all its data from the DB
+app.delete('/api/games/:gameId', (req, res) => {
+    try {
+        forgetGame(req.params.gameId);
+        const msg = JSON.stringify({ type: 'games_list', payload: listGames() });
+        for (const ws of clients) { if (ws.readyState === 1) ws.send(msg); }
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Historical data for the timeline chart.
 // ?precision=live|minute|hour   (default: live)
@@ -49,6 +78,43 @@ app.get('/api/history', (req, res) => {
     const gameId    = req.query.gameId    || getCurrentGameId();
     if (!gameId) return res.status(503).json({ error: 'No game data yet.' });
     res.json(getHistory(gameId, precision));
+});
+
+// Export history as CSV download
+app.get('/api/export', (req, res) => {
+    const precision = req.query.precision || 'live';
+    const gameId    = req.query.gameId    || getCurrentGameId();
+    if (!gameId) return res.status(503).json({ error: 'No game data yet.' });
+
+    const rows = getHistory(gameId, precision);
+
+    const escape = (v) => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+            ? '"' + s.replace(/"/g, '""') + '"'
+            : s;
+    };
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition',
+        `attachment; filename="second-shift-${gameId.slice(0, 8)}-${precision}.csv"`);
+
+    res.write('timestamp,tick,category,name,produced_per_min,consumed_per_min,net_per_min,status\n');
+
+    for (const snap of rows) {
+        for (const category of ['items', 'fluids', 'electricity']) {
+            for (const [name, item] of Object.entries(snap[category] || {})) {
+                const produced = item.producedPerMin ?? 0;
+                const consumed = item.consumedPerMin ?? 0;
+                const net      = item.netPerMin ?? (produced - consumed);
+                const status   = item.status ?? '';
+                res.write([snap.timestamp, snap.tick, category, name,
+                    produced, consumed, net, status].map(escape).join(',') + '\n');
+            }
+        }
+    }
+
+    res.end();
 });
 
 // WebSocket: push live updates to all connected dashboard tabs

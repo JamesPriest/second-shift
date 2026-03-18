@@ -8,6 +8,9 @@ function processStats(raw, wallClockMs = Date.now()) {
 
     const toPerMinute = (delta) => Math.max(0, Math.round((delta || 0) / minutesPerInterval));
 
+    // Electricity deltas are in joules; convert to average MW over the interval.
+    const toMW = (delta) => Math.max(0, (delta || 0) / intervalSeconds / 1_000_000);
+
     const processCategory = (categoryObj) => {
         const result = {};
         for (const [name, counts] of Object.entries(categoryObj || {})) {
@@ -22,6 +25,26 @@ function processStats(raw, wallClockMs = Date.now()) {
                 status = 'surplus';
             }
             result[name] = { name, producedPerMin: producedPM, consumedPerMin: consumedPM, netPerMin: netPM, status };
+        }
+        return result;
+    };
+
+    // Electricity entries use MW instead of items/min.
+    // producedPerMin / consumedPerMin / netPerMin fields hold MW values.
+    const processElectricity = (electricityObj) => {
+        const result = {};
+        for (const [name, counts] of Object.entries(electricityObj || {})) {
+            const producedMW = toMW(counts.produced);
+            const consumedMW = toMW(counts.consumed);
+            const netMW = producedMW - consumedMW;
+            let status = 'balanced';
+            if (consumedMW > producedMW) {
+                const ratio = producedMW === 0 ? Infinity : consumedMW / producedMW;
+                status = ratio >= 1.5 ? 'deficit-severe' : 'deficit-warning';
+            } else if (producedMW > consumedMW) {
+                status = 'surplus';
+            }
+            result[name] = { name, producedPerMin: producedMW, consumedPerMin: consumedMW, netPerMin: netMW, status };
         }
         return result;
     };
@@ -56,7 +79,7 @@ function processStats(raw, wallClockMs = Date.now()) {
             // Merged totals for "All Planets" — same shape as per-surface stats
             items:      processCategory(mergedItems),
             fluids:     processCategory(mergedFluids),
-            electricity: {},
+            electricity: processElectricity(raw.electricity),
         };
     }
 

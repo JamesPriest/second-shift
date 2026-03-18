@@ -152,6 +152,8 @@ main {
 
 li.deficit-severe  { background: #ef444418; border-left-color: var(--red);    }
 li.deficit-warning { background: #f59e0b18; border-left-color: var(--yellow); }
+li.below-target    { background: #f9731618; border-left-color: #f97316; }
+li.below-target .net { color: #f97316; }
 li.ok              { color: var(--green); font-size: 0.75rem; }
 li.placeholder     { color: var(--muted); font-size: 0.75rem; }
 
@@ -371,7 +373,9 @@ li.placeholder     { color: var(--muted); font-size: 0.75rem; }
     position: relative;
     height: 200px;
     padding: 0.5rem 0.75rem 0.5rem 0.5rem;
+    cursor: pointer;
 }
+.card-body:hover { background: #ffffff06; }
 
 #timeline-empty {
     position: absolute;
@@ -435,6 +439,67 @@ li.placeholder     { color: var(--muted); font-size: 0.75rem; }
     max-width: 200px;
 }
 
+/* ── Maximized chart modal ───────────────────────────────────────────────────── */
+#chart-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#chart-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+#chart-modal-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--card-accent, var(--blue));
+    border-radius: 6px;
+    width: min(92vw, 1100px);
+    height: min(82vh, 620px);
+    display: flex;
+    flex-direction: column;
+}
+
+#chart-modal-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    padding: 0.75rem;
+}
+
+#chart-modal-canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────────── */
+#toast {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.45rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+    z-index: 300;
+}
+#toast.visible { opacity: 1; }
+
 /* ── Waiting overlay ─────────────────────────────────────────────────────────── */
 #waiting-overlay {
     position: fixed;
@@ -451,3 +516,159 @@ li.placeholder     { color: var(--muted); font-size: 0.75rem; }
     pointer-events: none;
 }
 #waiting-overlay.visible { opacity: 1; }
+
+/* ── Sidebar collapse ────────────────────────────────────────────────────────── */
+#deficit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+#sidebar-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.8rem;
+    font-family: inherit;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s;
+}
+#sidebar-toggle:hover { color: var(--text); border-color: var(--text); }
+
+#overview-view {
+    transition: grid-template-columns 0.2s;
+}
+#overview-view.sidebar-collapsed {
+    grid-template-columns: 40px 1fr;
+}
+#overview-view.sidebar-collapsed #deficit-panel {
+    padding: 0.5rem 0;
+    overflow: hidden;
+}
+#overview-view.sidebar-collapsed #deficit-header h2,
+#overview-view.sidebar-collapsed #deficit-list {
+    display: none;
+}
+#overview-view.sidebar-collapsed #deficit-header {
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+}
+
+/* ── Responsive breakpoints ──────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    body {
+        overflow-y: auto;
+        height: auto;
+        min-height: 100vh;
+    }
+    main {
+        grid-template-columns: 1fr;
+        height: auto;
+        flex: none;
+    }
+    #deficit-panel {
+        max-height: 220px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+    #chart-section {
+        min-height: 380px;
+    }
+    #timeline-view {
+        min-height: 500px;
+        flex: none;
+    }
+    #timeline-section {
+        overflow-y: visible;
+    }
+}
+
+@media (max-width: 900px) {
+    #card-grid {
+        grid-template-columns: 1fr;
+    }
+    #overview-controls,
+    #timeline-controls {
+        gap: 0.5rem;
+    }
+}
+
+/* ── Notes panel ─────────────────────────────────────────────────────────────── */
+.card-notes-panel {
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    background: #0d1117;
+}
+
+.notes-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.note-empty {
+    color: var(--muted);
+    font-size: 0.7rem;
+}
+
+.note-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+}
+
+.note-text  { color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-date  { color: var(--muted); font-size: 0.65rem; flex-shrink: 0; }
+.note-delete {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.note-delete:hover { color: var(--red); }
+
+.note-add-row {
+    display: flex;
+    gap: 0.35rem;
+}
+.note-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: inherit;
+    min-width: 0;
+}
+.note-input:focus { outline: none; border-color: #a855f7; }
+.note-add-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+}
+.note-add-btn:hover { color: var(--text); border-color: var(--text); }

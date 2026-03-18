@@ -6,7 +6,6 @@
     <title>Second Shift — Factorio Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
     <header>
@@ -14,10 +13,12 @@
         <div id="status-bar">
             <span id="connection-badge" class="badge disconnected">Connecting…</span>
             <span id="last-update">Waiting for data…</span>
+            <button id="notif-toggle" class="filter-btn" title="Toggle deficit alerts (requires browser notification permission)">Alerts</button>
         </div>
         <div id="game-selector-wrap">
             <span>Save:</span>
             <select id="game-selector"><option value="">—</option></select>
+            <button id="forget-game" class="filter-btn" title="Remove this save and all its data from the database">Forget</button>
         </div>
 
         <!-- View toggle -->
@@ -61,6 +62,9 @@
                 <button class="filter-btn" data-precision="minute">Minutes (2h)</button>
                 <button class="filter-btn" data-precision="hour">Hours (5d)</button>
             </nav>
+            <label id="live-window-wrap">Show last
+                <input id="live-window" type="number" value="30" min="1" max="120" step="5"> min
+            </label>
             <label>Category
                 <select id="timeline-cat">
                     <option value="items">Items</option>
@@ -72,6 +76,9 @@
                 <ul id="item-suggestions"></ul>
             </div>
             <div id="selected-items"></div>
+            <button id="trigger-backfill" class="filter-btn" title="Force an immediate backfill (copies Factorio console command)">Backfill</button>
+            <button id="export-csv" class="filter-btn" title="Download timeline data as CSV">Export CSV</button>
+
             <!-- Profile save / load -->
             <div id="profile-controls">
                 <select id="profile-select"><option value="">— Load profile —</option></select>
@@ -84,7 +91,10 @@
     <!-- Overview view -->
     <main id="overview-view">
         <section id="deficit-panel">
-            <h2>Deficits</h2>
+            <div id="deficit-header">
+                <h2>Deficits</h2>
+                <button id="sidebar-toggle" title="Collapse/expand deficit panel">‹</button>
+            </div>
             <ul id="deficit-list">
                 <li class="placeholder">Waiting for data…</li>
             </ul>
@@ -103,6 +113,23 @@
     </main>
 
     <div id="waiting-overlay">Waiting for game…</div>
+    <div id="toast"></div>
+
+    <!-- Maximized chart modal -->
+    <div id="chart-modal" class="hidden">
+        <div id="chart-modal-backdrop"></div>
+        <div id="chart-modal-card">
+            <div class="card-header">
+                <span id="chart-modal-icon"></span>
+                <span id="chart-modal-title" class="card-title"></span>
+                <div id="chart-modal-toggles" class="card-toggles"></div>
+                <button id="chart-modal-close" class="card-close" title="Close">×</button>
+            </div>
+            <div id="chart-modal-body">
+                <canvas id="chart-modal-canvas"></canvas>
+            </div>
+        </div>
+    </div>
 
     <script src="items.js"></script>
     <script src="dashboard.js"></script>

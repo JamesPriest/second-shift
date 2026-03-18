@@ -59,9 +59,22 @@ Open `.env` and set `FACTORIO_SCRIPT_OUTPUT` to the `script-output` path from th
 FACTORIO_SCRIPT_OUTPUT=C:\Users\YourName\AppData\Roaming\Factorio\script-output
 ```
 
+Optionally, point `FACTORIO_DATA_PATH` at your Factorio install's `data/` folder to enable item icons in the dashboard:
+
+```
+# Windows (Steam)
+FACTORIO_DATA_PATH=C:\Program Files (x86)\Steam\steamapps\common\Factorio\data
+# Linux (Steam)
+FACTORIO_DATA_PATH=~/.steam/steam/steamapps/common/Factorio/data
+```
+
 ---
 
 ## 3. Start the server
+
+**Quickest:** double-click `start.bat` (Windows) or run `./start.sh` (Linux/Mac) from the project root.
+
+Or manually:
 
 ```bash
 cd server
@@ -81,18 +94,38 @@ The status badge in the top-left shows **Live** once data is flowing. The first 
 
 ## Dashboard overview
 
+### Overview view
+
+The default view. Shows what's in deficit right now.
+
 | Control                          | Description                                            |
 | -------------------------------- | ------------------------------------------------------ |
 | **Items / Fluids / Electricity** | Switch stat category                                   |
+| **Planet**                       | Filter to a single surface (Space Age)                 |
+| **Save**                         | Switch between stored game saves                       |
 | **Show top N**                   | Limit how many rows the chart shows                    |
 | **Sort by**                      | Order by consumed, produced, deficit severity, or name |
 
 **Left panel** lists every item currently in deficit, worst first:
 
-- 🔴 Red — consuming 50%+ more than producing (severe)
-- 🟡 Yellow — consuming any amount more than producing (warning)
+- Red — consuming 50%+ more than producing (severe)
+- Yellow — consuming any amount more than producing (warning)
 
 **Right panel** shows a horizontal bar chart of produced vs consumed per minute, bars coloured by status.
+
+### Timeline view
+
+Historical production charts. Switch to it with the **Timeline** button in the header.
+
+| Control                     | Description                                                       |
+| --------------------------- | ----------------------------------------------------------------- |
+| **Live / Minutes / Hours**  | Switch data precision (5s live, 1-min buckets 2h, 1-hour buckets 5d) |
+| **Search items**            | Add items to the card grid                                        |
+| **Profiles**                | Save/load named item selections (stored in browser localStorage)  |
+
+Each selected item gets its own chart card showing produced (green) and consumed (amber) over time. Click the **P** / **C** buttons on a card to toggle either line.
+
+The first time you open Timeline, a default set of key intermediate products is pre-selected.
 
 ---
 
@@ -105,5 +138,15 @@ The status badge in the top-left shows **Live** once data is flowing. The first 
 1. The mod is enabled and the game is running (not paused)
 2. `FACTORIO_SCRIPT_OUTPUT` in `.env` points to the correct folder
 3. `second-shift.json` exists in that folder
+
+**Minutes / Hours tabs show no data** — the backfill runs once per in-game hour. To force it immediately, open the Factorio console and run:
+
+```
+/c storage.last_backfill_tick = nil
+```
+
+Then wait ~10 seconds for the server to pick it up.
+
+**Item icons not showing** — set `FACTORIO_DATA_PATH` in `.env` to your Factorio `data/` folder (see step 2 above).
 
 **Check mod logs** — in Factorio: Help → Open Log File, then search for `[second-shift]`.

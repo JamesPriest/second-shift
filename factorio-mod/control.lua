@@ -36,6 +36,36 @@ local function snapshot_stat(stat)
     return s
 end
 
+-- Snapshot force-wide electric network statistics.
+-- Returns { inputs = { name = cumulative_joules }, outputs = { … } }
+local function snapshot_electricity(force)
+    local s = { inputs = {}, outputs = {} }
+    local ok, stat = pcall(function() return force.electric_network_statistics end)
+    if ok and stat then
+        for name, count in pairs(stat.input_counts)  do s.inputs[name]  = count end
+        for name, count in pairs(stat.output_counts) do s.outputs[name] = count end
+    end
+    return s
+end
+
+-- Diff two electricity snapshots. Returns { name = { produced = joules, consumed = joules } }
+local function compute_electricity_deltas(prev_elec, curr_elec)
+    local deltas = {}
+    local names  = {}
+    for name in pairs(curr_elec.inputs)  do names[name] = true end
+    for name in pairs(curr_elec.outputs) do names[name] = true end
+    for name in pairs(names) do
+        local p_in  = (prev_elec and prev_elec.inputs[name])  or 0
+        local p_out = (prev_elec and prev_elec.outputs[name]) or 0
+        local consumed = (curr_elec.inputs[name]  or 0) - p_in
+        local produced = (curr_elec.outputs[name] or 0) - p_out
+        if consumed > 0 or produced > 0 then
+            deltas[name] = { produced = produced, consumed = consumed }
+        end
+    end
+    return deltas
+end
+
 -- Snapshot item + fluid stats for every surface, keyed by surface name.
 -- Returns { [surface_name] = { items = snap, fluids = snap } }
 local function snapshot_per_surface(force)
@@ -172,10 +202,20 @@ local function write_backfill(force)
         local item_count = 0; for _ in pairs(items_merged) do item_count = item_count + 1 end
         ss_log("backfill " .. prec.key .. ": " .. surface_count .. " surfaces, " .. item_count .. " merged items")
 
+        -- Electricity is per-force, not per-surface — collect once outside the surface loop.
+        local electricity_hist = {}
+        local ok_e, elec_stat = pcall(function() return force.electric_network_statistics end)
+        if ok_e and elec_stat then
+            electricity_hist = collect_flow_history(elec_stat, prec.precision, prec.n_buckets)
+        else
+            ss_log("backfill " .. prec.key .. ": electric stat failed: " .. tostring(elec_stat))
+        end
+
         precisions_out[prec.key] = {
             bucket_ticks = prec.bucket_ticks,
             items        = items_merged,
             fluids       = fluids_merged,
+            electricity  = electricity_hist,
         }
     end
 
@@ -192,6 +232,7 @@ end
 script.on_init(function()
     storage.game_id            = generate_id()
     storage.prev_surfaces      = nil
+    storage.prev_electricity   = nil
     storage.last_backfill_tick = nil
     ss_log("initialized  game_id=" .. storage.game_id)
 end)
@@ -232,8 +273,11 @@ script.on_nth_tick(TICK_INTERVAL, function(event)
         storage.last_backfill_tick = event.tick
     end
 
-    local curr_surfaces = snapshot_per_surface(force)
-    local surface_deltas = compute_surface_deltas(storage.prev_surfaces, curr_surfaces)
+    local curr_surfaces      = snapshot_per_surface(force)
+    local surface_deltas     = compute_surface_deltas(storage.prev_surfaces, curr_surfaces)
+
+    local curr_electricity   = snapshot_electricity(force)
+    local electricity_deltas = compute_electricity_deltas(storage.prev_electricity, curr_electricity)
 
     local payload = {
         schema_version = 2,
@@ -241,10 +285,12 @@ script.on_nth_tick(TICK_INTERVAL, function(event)
         tick           = event.tick,
         interval_ticks = TICK_INTERVAL,
         surfaces       = surface_deltas,
+        electricity    = electricity_deltas,
     }
 
     helpers.write_file(OUTPUT_FILE, helpers.table_to_json(payload), false)
     ss_log("wrote tick=" .. event.tick)
 
-    storage.prev_surfaces = curr_surfaces
+    storage.prev_surfaces    = curr_surfaces
+    storage.prev_electricity = curr_electricity
 end)

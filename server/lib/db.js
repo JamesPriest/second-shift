@@ -1,6 +1,22 @@
 'use strict';
 const path     = require('path');
+const zlib     = require('zlib');
 const Database = require('better-sqlite3');
+
+// Compress a snapshot object to a gzipped Buffer for storage.
+function compressSnapshot(obj) {
+    return zlib.gzipSync(JSON.stringify(obj));
+}
+
+// Decompress a stored snapshot. Handles both:
+//   Buffer  — gzip-compressed (new format)
+//   string  — raw JSON (legacy rows written before compression was added)
+function decompressSnapshot(stored) {
+    if (Buffer.isBuffer(stored)) {
+        return JSON.parse(zlib.gunzipSync(stored).toString('utf8'));
+    }
+    return JSON.parse(stored);
+}
 
 const DB_PATH = path.join(__dirname, '..', 'second-shift.db');
 
@@ -160,7 +176,7 @@ function addLiveSnapshot(gameId, snapshot) {
 
     const now = new Date().toISOString();
     stmts.upsertGameWithTick.run(gameId, now, now, tick);
-    stmts.insertLive.run(gameId, snapshot.timestamp, tick, JSON.stringify(snapshot));
+    stmts.insertLive.run(gameId, snapshot.timestamp, tick, compressSnapshot(snapshot));
     stmts.pruneLive.run(gameId);
 
     return { reloadDetected };
@@ -209,24 +225,31 @@ function processBackfill(gameId, raw) {
         const toPerMin    = precKey === 'one_hour' ? (1 / 60) : 1;
         const rows        = [];
 
-        const itemKeys = Object.keys(precData.items  || {}).length;
-        const fluidKeys = Object.keys(precData.fluids || {}).length;
-        console.log(`[db] backfill ${precKey}: raw items=${itemKeys} fluids=${fluidKeys}`);
+        const itemKeys  = Object.keys(precData.items       || {}).length;
+        const fluidKeys = Object.keys(precData.fluids      || {}).length;
+        const elecKeys  = Object.keys(precData.electricity || {}).length;
+        console.log(`[db] backfill ${precKey}: raw items=${itemKeys} fluids=${fluidKeys} electricity=${elecKeys}`);
         if (itemKeys > 0) {
             const sampleName = Object.keys(precData.items)[0];
             const sample = precData.items[sampleName];
             console.log(`[db]   sample "${sampleName}": input=${JSON.stringify(sample.input).slice(0, 60)}`);
         }
 
-        for (const category of ['items', 'fluids']) {
+        // Electricity buckets are in joules; convert to average MW over the bucket window.
+        // one_minute (3600 ticks = 60 s): joules / 60 / 1e6
+        // one_hour  (216000 ticks = 3600 s): joules / 3600 / 1e6
+        const electricityScale = precKey === 'one_hour' ? 1 / 3_600_000_000 : 1 / 60_000_000;
+
+        for (const category of ['items', 'fluids', 'electricity']) {
+            const scale = category === 'electricity' ? electricityScale : toPerMin;
             for (const [name, counts] of Object.entries(precData[category] || {})) {
                 const inputArr  = normalizeBuckets(counts.input);
                 const outputArr = normalizeBuckets(counts.output);
                 const n = Math.max(inputArr.length, outputArr.length);
                 for (let i = 0; i < n; i++) {
-                    const produced = Math.round((outputArr[i] || 0) * toPerMin);
-                    const consumed = Math.round((inputArr[i]  || 0) * toPerMin);
-                    if (produced === 0 && consumed === 0) continue;
+                    const produced = (outputArr[i] || 0) * scale;
+                    const consumed = (inputArr[i]  || 0) * scale;
+                    if (produced < 0.0001 && consumed < 0.0001) continue;
 
                     // Stable integer key: game-tick at the start of this bucket.
                     // Identical across multiple backfills → enables idempotent upserts.
@@ -253,7 +276,7 @@ function processBackfill(gameId, raw) {
 function getLiveHistory(gameId) {
     if (!gameId) gameId = currentGameId;
     if (!gameId) return [];
-    return stmts.getLive.all(gameId).map(row => JSON.parse(row.snapshot_json));
+    return stmts.getLive.all(gameId).map(row => decompressSnapshot(row.snapshot_json));
 }
 
 // Reconstruct snapshot-shaped objects from columnar history rows.
@@ -269,12 +292,13 @@ function getBackfillHistory(gameId, precision) {
     for (const row of rows) {
         if (!buckets.has(row.bucket_game_tick)) {
             buckets.set(row.bucket_game_tick, {
-                timestamp: row.bucket_timestamp,
-                tick:      row.bucket_game_tick,
-                source:    'backfill',
+                timestamp:   row.bucket_timestamp,
+                tick:        row.bucket_game_tick,
+                source:      'backfill',
                 precision,
-                items:     {},
-                fluids:    {},
+                items:       {},
+                fluids:      {},
+                electricity: {},
             });
         }
         const snap = buckets.get(row.bucket_game_tick);
@@ -297,4 +321,19 @@ function getHistory(gameId, precision) {
     return getBackfillHistory(gameId, precision);
 }
 
-module.exports = { init, addLiveSnapshot, processBackfill, getHistory, getCurrentGameId, listGames };
+// ── Game management ───────────────────────────────────────────────────────────
+
+function forgetGame(gameId) {
+    db.transaction(() => {
+        db.prepare('DELETE FROM live_snapshots WHERE game_id = ?').run(gameId);
+        db.prepare('DELETE FROM history        WHERE game_id = ?').run(gameId);
+        db.prepare('DELETE FROM games          WHERE game_id = ?').run(gameId);
+    })();
+    if (currentGameId === gameId) {
+        const latest = db.prepare('SELECT game_id FROM games ORDER BY last_seen DESC LIMIT 1').get();
+        currentGameId = latest?.game_id || null;
+    }
+    console.log(`[db] forgot game=${gameId}`);
+}
+
+module.exports = { init, addLiveSnapshot, processBackfill, getHistory, getCurrentGameId, listGames, forgetGame };
